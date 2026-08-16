@@ -5,6 +5,7 @@ const cors = require("cors");
 const crypto = require("crypto");
 const db = require("./db");
 const logik = require("./logik");
+const telegram = require("./telegram");
 
 const app = express();
 app.use(cors());
@@ -86,6 +87,16 @@ app.post("/api/freigaben", (req, res) => {
     db.exec("ROLLBACK");
     throw err;
   }
+
+  // Telegram-Kanal benachrichtigen (läuft im Hintergrund, blockiert die Antwort nicht)
+  const team = db.prepare("SELECT name FROM teams WHERE id = ?").get(eintraege[0]?.teamId);
+  const angelegteFreigaben = db
+    .prepare(
+      `SELECT f.*, s.ort AS ort FROM freigaben f JOIN slots s ON f.slot_id = s.id WHERE f.id IN (${erzeugt.map(() => "?").join(",")})`
+    )
+    .all(...erzeugt);
+  telegram.telegramNachrichtSenden(telegram.formatiereFreigabeNachricht(angelegteFreigaben, team?.name || "Ein Team"));
+
   res.json({ erzeugt });
 });
 
