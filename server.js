@@ -74,7 +74,10 @@ app.post("/api/freigaben", (req, res) => {
   try {
     for (const e of eintraege) {
       const id = neueId("f");
-      const punktZeitpunkt = new Date(e.datum).getTime();
+      const [pzH, pzM] = e.uhrzeit.split(":").map(Number);
+      const punktDatum = new Date(e.datum);
+      punktDatum.setHours(pzH, pzM, 0, 0);
+      const punktZeitpunkt = punktDatum.getTime();
       einfuegen.run(id, e.slotId, e.teamId, e.datum, e.uhrzeit, jetzt, punktZeitpunkt);
       erzeugt.push(id);
     }
@@ -124,6 +127,27 @@ app.post("/api/sperrzeiten", (req, res) => {
 
 app.delete("/api/sperrzeiten/:id", (req, res) => {
   db.prepare("DELETE FROM sperrzeiten WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ---------- Einzelpersonen (Einzeltraining, kein eigenes Team) ----------
+app.get("/api/einzelpersonen", (req, res) => {
+  res.json(db.prepare("SELECT * FROM einzelpersonen ORDER BY name").all());
+});
+
+app.post("/api/einzelpersonen", (req, res) => {
+  const { name, verknuepftesTeamId } = req.body;
+  const id = neueId("einzel");
+  db.prepare("INSERT INTO einzelpersonen (id, name, verknuepftes_team_id) VALUES (?, ?, ?)").run(
+    id,
+    name,
+    verknuepftesTeamId || null
+  );
+  res.json({ id, name, verknuepftesTeamId: verknuepftesTeamId || null });
+});
+
+app.delete("/api/einzelpersonen/:id", (req, res) => {
+  db.prepare("DELETE FROM einzelpersonen WHERE id = ?").run(req.params.id);
   res.json({ ok: true });
 });
 

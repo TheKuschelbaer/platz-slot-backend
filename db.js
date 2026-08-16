@@ -53,6 +53,12 @@ CREATE TABLE IF NOT EXISTS einstellungen (
   schluessel TEXT PRIMARY KEY,
   wert TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS einzelpersonen (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  verknuepftes_team_id TEXT REFERENCES teams(id)
+);
 `);
 
 function seedFallsLeer() {
@@ -101,6 +107,12 @@ function seedFallsLeer() {
     ["sp1", "Weihnachtspause – Anlage gesperrt", "2026-12-23", "2027-01-02"],
     ["sp2", "Herbstferien – Platzpflege", "2026-10-12", "2026-10-16"],
   ];
+  const einzelpersonen = [
+    ["einzel-1", "Julia (Einzelperson)", null],
+    ["einzel-2", "Tom (Einzelperson)", null],
+    ["einzel-3", "Nina (Einzelperson)", null],
+    ["einzel-4", "Du (Einzeltraining)", "t6"],
+  ];
 
   const teamInsert = db.prepare(
     "INSERT INTO teams (id, name, punkte, farbe, logo, logo_url, ist_admin) VALUES (@id, @name, 0, @farbe, @logo, NULL, @ist_admin)"
@@ -111,12 +123,16 @@ function seedFallsLeer() {
   const sperreInsert = db.prepare(
     "INSERT INTO sperrzeiten (id, grund, start, ende) VALUES (?, ?, ?, ?)"
   );
+  const einzelInsert = db.prepare(
+    "INSERT INTO einzelpersonen (id, name, verknuepftes_team_id) VALUES (?, ?, ?)"
+  );
 
   db.exec("BEGIN");
   try {
     for (const t of teams) teamInsert.run({ ist_admin: 0, ...t });
     for (const s of slots) slotInsert.run(...s);
     for (const sp of sperrzeiten) sperreInsert.run(...sp);
+    for (const e of einzelpersonen) einzelInsert.run(...e);
     db.exec("COMMIT");
   } catch (err) {
     db.exec("ROLLBACK");
