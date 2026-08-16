@@ -1,0 +1,19 @@
+{
+  "name": "platz-slot-backend",
+  "version": "1.0.0",
+  "description": "Backend für die Platz-Slot-App (Olympia FOX) des ESV Olympia Köln",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

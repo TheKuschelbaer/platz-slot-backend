@@ -1,0 +1,6 @@
+node_modules/
+platz-slot.db
+platz-slot.db-journal
+platz-slot.db-wal
+platz-slot.db-shm
+.env
