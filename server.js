@@ -256,6 +256,43 @@ app.delete("/api/telegram-zuordnungen/:telegramId", (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Notfall-Reparatur ----------
+// Nirgends in der App verlinkt. Nur für den Fall, dass eine Telegram-Zuordnung
+// (z. B. deine eigene Admin-Zuordnung) verloren geht und niemand mehr Admin-Rechte
+// hat, um sie über die normale Oberfläche zu reparieren.
+// Aufruf z. B. direkt im Browser als POST (z. B. mit einem kleinen Tool wie Postman)
+// oder über die separate notfall.html, die dafür bereitsteht.
+app.post("/api/notfall-reparatur", (req, res) => {
+  const { code, telegramId, teamId } = req.body;
+  const NOTFALL_CODE = process.env.NOTFALL_CODE;
+
+  if (!NOTFALL_CODE) {
+    return res.status(503).json({ fehler: "Kein NOTFALL_CODE konfiguriert – Funktion ist deaktiviert" });
+  }
+  if (code !== NOTFALL_CODE) {
+    return res.status(401).json({ fehler: "Falscher Code" });
+  }
+  if (!telegramId || !teamId) {
+    return res.status(400).json({ fehler: "telegramId und teamId sind erforderlich" });
+  }
+
+  const team = db.prepare("SELECT * FROM teams WHERE id = ?").get(teamId);
+  if (!team) return res.status(404).json({ fehler: `Team "${teamId}" existiert nicht` });
+
+  const bestehend = db.prepare("SELECT * FROM telegram_zuordnungen WHERE telegram_id = ?").get(telegramId);
+  if (bestehend) {
+    db.prepare(
+      "UPDATE telegram_zuordnungen SET rolle = 'team', team_id = ?, admin_name = NULL WHERE telegram_id = ?"
+    ).run(teamId, telegramId);
+  } else {
+    db.prepare(
+      "INSERT INTO telegram_zuordnungen (telegram_id, rolle, team_id, erstellt_am) VALUES (?, 'team', ?, ?)"
+    ).run(telegramId, teamId, Date.now());
+  }
+
+  res.json({ ok: true, nachricht: `Telegram-ID ${telegramId} ist jetzt Team "${team.name}" zugeordnet.` });
+});
+
 // ---------- Hintergrund-Job: alle 60 Sekunden Punkte/Reset prüfen ----------
 logik.hintergrundJobAusfuehren();
 setInterval(logik.hintergrundJobAusfuehren, 60 * 1000);

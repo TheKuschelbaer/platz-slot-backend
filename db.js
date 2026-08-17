@@ -122,9 +122,6 @@ function seedFallsLeer() {
     ["sp2", "Herbstferien – Platzpflege", "2026-10-12", "2026-10-16"],
   ];
   const einzelpersonen = [
-    ["einzel-1", "Julia (Einzelperson)", null],
-    ["einzel-2", "Tom (Einzelperson)", null],
-    ["einzel-3", "Nina (Einzelperson)", null],
     ["einzel-4", "Du (Einzeltraining)", "t6"],
   ];
 
