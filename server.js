@@ -256,6 +256,22 @@ app.delete("/api/telegram-zuordnungen/:telegramId", (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Testdaten zurücksetzen ----------
+// Löscht ALLE Freigaben und setzt alle Punktestände auf 0. Rührt Teams, Slots,
+// Sperrzeiten, Einzelpersonen und Telegram-Zuordnungen NICHT an.
+app.post("/api/testdaten-zuruecksetzen", (req, res) => {
+  db.exec("BEGIN");
+  try {
+    db.exec("DELETE FROM freigaben");
+    db.exec("UPDATE teams SET punkte = 0");
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+  res.json({ ok: true });
+});
+
 // ---------- Notfall-Reparatur ----------
 // Nirgends in der App verlinkt. Nur für den Fall, dass eine Telegram-Zuordnung
 // (z. B. deine eigene Admin-Zuordnung) verloren geht und niemand mehr Admin-Rechte
