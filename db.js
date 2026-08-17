@@ -59,6 +59,20 @@ CREATE TABLE IF NOT EXISTS einzelpersonen (
   name TEXT NOT NULL,
   verknuepftes_team_id TEXT REFERENCES teams(id)
 );
+
+-- Ordnet einen echten, per Telegram-Login verifizierten Account einer Rolle zu:
+-- entweder einem Team, einem reinen Admin-Account (ohne Team) oder einer Einzelperson.
+-- Genau eines von team_id / einzelperson_id / admin_name ist gesetzt, je nach "rolle".
+CREATE TABLE IF NOT EXISTS telegram_zuordnungen (
+  telegram_id TEXT PRIMARY KEY,
+  rolle TEXT NOT NULL, -- 'team' | 'admin' | 'einzelperson'
+  team_id TEXT REFERENCES teams(id),
+  einzelperson_id TEXT REFERENCES einzelpersonen(id),
+  admin_name TEXT,
+  telegram_anzeigename TEXT,
+  telegram_username TEXT,
+  erstellt_am INTEGER NOT NULL
+);
 `);
 
 function seedFallsLeer() {

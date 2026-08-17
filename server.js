@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const db = require("./db");
 const logik = require("./logik");
 const telegram = require("./telegram");
+const { pruefeTelegramLogin } = require("./telegram-auth");
 
 const app = express();
 app.use(cors());
@@ -157,8 +158,101 @@ app.post("/api/einzelpersonen", (req, res) => {
   res.json({ id, name, verknuepftesTeamId: verknuepftesTeamId || null });
 });
 
+app.patch("/api/einzelpersonen/:id", (req, res) => {
+  const { name } = req.body;
+  db.prepare("UPDATE einzelpersonen SET name = ? WHERE id = ?").run(name, req.params.id);
+  res.json({ ok: true });
+});
+
 app.delete("/api/einzelpersonen/:id", (req, res) => {
   db.prepare("DELETE FROM einzelpersonen WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ---------- Telegram-Login ----------
+// body: die vom Telegram-Login-Widget gelieferten Felder
+// { id, first_name, last_name, username, photo_url, auth_date, hash }
+app.post("/api/telegram-login", (req, res) => {
+  const pruefung = pruefeTelegramLogin(req.body);
+  if (!pruefung.gueltig) {
+    return res.status(401).json({ fehler: pruefung.grund });
+  }
+
+  const telegramId = String(req.body.id);
+  const anzeigename = [req.body.first_name, req.body.last_name].filter(Boolean).join(" ");
+
+  let zuordnung = db.prepare("SELECT * FROM telegram_zuordnungen WHERE telegram_id = ?").get(telegramId);
+
+  if (!zuordnung) {
+    // Erstmaliger Login dieser Person: automatisch als neue Einzelperson anlegen
+    const einzelpersonId = neueId("einzel");
+    db.prepare("INSERT INTO einzelpersonen (id, name, verknuepftes_team_id) VALUES (?, ?, NULL)").run(
+      einzelpersonId,
+      anzeigename || `Telegram-Nutzer ${telegramId}`
+    );
+    db.prepare(
+      "INSERT INTO telegram_zuordnungen (telegram_id, rolle, einzelperson_id, telegram_anzeigename, telegram_username, erstellt_am) VALUES (?, 'einzelperson', ?, ?, ?, ?)"
+    ).run(telegramId, einzelpersonId, anzeigename, req.body.username || null, Date.now());
+    zuordnung = { telegram_id: telegramId, rolle: "einzelperson", einzelperson_id: einzelpersonId };
+  }
+
+  if (zuordnung.rolle === "team") {
+    return res.json({ rolle: "team", teamId: zuordnung.team_id });
+  }
+  if (zuordnung.rolle === "admin") {
+    return res.json({ rolle: "admin", adminName: zuordnung.admin_name });
+  }
+  return res.json({ rolle: "einzelperson", einzelpersonId: zuordnung.einzelperson_id });
+});
+
+// ---------- Telegram-Zuordnungen verwalten (nur für Admins gedacht) ----------
+app.get("/api/telegram-zuordnungen", (req, res) => {
+  const zuordnungen = db
+    .prepare(
+      `SELECT z.*, t.name AS team_name, e.name AS einzelperson_name
+       FROM telegram_zuordnungen z
+       LEFT JOIN teams t ON z.team_id = t.id
+       LEFT JOIN einzelpersonen e ON z.einzelperson_id = e.id
+       ORDER BY z.erstellt_am DESC`
+    )
+    .all();
+  res.json(zuordnungen);
+});
+
+// Ordnet eine bestehende Telegram-Zuordnung neu zu: Team, Admin oder Einzelperson
+// body: { rolle: 'team'|'admin'|'einzelperson', teamId?, adminName? }
+app.patch("/api/telegram-zuordnungen/:telegramId", (req, res) => {
+  const { rolle, teamId, adminName } = req.body;
+  const bestehend = db.prepare("SELECT * FROM telegram_zuordnungen WHERE telegram_id = ?").get(req.params.telegramId);
+  if (!bestehend) return res.status(404).json({ fehler: "Zuordnung nicht gefunden" });
+
+  if (rolle === "team") {
+    db.prepare(
+      "UPDATE telegram_zuordnungen SET rolle = 'team', team_id = ?, admin_name = NULL WHERE telegram_id = ?"
+    ).run(teamId, req.params.telegramId);
+  } else if (rolle === "admin") {
+    db.prepare(
+      "UPDATE telegram_zuordnungen SET rolle = 'admin', team_id = NULL, admin_name = ? WHERE telegram_id = ?"
+    ).run(adminName || bestehend.telegram_anzeigename, req.params.telegramId);
+  } else {
+    // zurück auf Einzelperson (bestehenden verknüpften Datensatz behalten, falls vorhanden)
+    let einzelpersonId = bestehend.einzelperson_id;
+    if (!einzelpersonId) {
+      einzelpersonId = neueId("einzel");
+      db.prepare("INSERT INTO einzelpersonen (id, name, verknuepftes_team_id) VALUES (?, ?, NULL)").run(
+        einzelpersonId,
+        bestehend.telegram_anzeigename || "Einzelperson"
+      );
+    }
+    db.prepare(
+      "UPDATE telegram_zuordnungen SET rolle = 'einzelperson', team_id = NULL, admin_name = NULL, einzelperson_id = ? WHERE telegram_id = ?"
+    ).run(einzelpersonId, req.params.telegramId);
+  }
+  res.json({ ok: true });
+});
+
+app.delete("/api/telegram-zuordnungen/:telegramId", (req, res) => {
+  db.prepare("DELETE FROM telegram_zuordnungen WHERE telegram_id = ?").run(req.params.telegramId);
   res.json({ ok: true });
 });
 
