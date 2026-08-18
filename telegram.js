@@ -34,6 +34,15 @@ async function telegramNachrichtSenden(text) {
 }
 
 const WOCHENTAGE_LANG = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const MONATE_LANG = [
+  "Januar", "Februar", "März", "April", "Mai", "Juni",
+  "Juli", "August", "September", "Oktober", "November", "Dezember",
+];
+
+function formatiereDatumLang(datumText) {
+  const d = new Date(datumText + "T00:00:00");
+  return `${d.getDate()}. ${MONATE_LANG[d.getMonth()]} ${d.getFullYear()}`;
+}
 
 function formatiereFreigabeNachricht(freigaben, teamName) {
   const APP_URL = process.env.APP_URL || "";
@@ -43,7 +52,7 @@ function formatiereFreigabeNachricht(freigaben, teamName) {
     return (
       `⚽ <b>Slot frei!</b>\n` +
       `${teamName} hat freigegeben:\n` +
-      `${tag}, ${f.datum} um ${f.uhrzeit} Uhr (${f.ort})` +
+      `${tag}, ${formatiereDatumLang(f.datum)} um ${f.uhrzeit} Uhr (${f.ort})` +
       (APP_URL ? `\n\n${APP_URL}` : "")
     );
   }
