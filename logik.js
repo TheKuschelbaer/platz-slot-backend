@@ -29,6 +29,11 @@ function hintergrundJobAusfuehren() {
     alsVergebenMarkieren.run(f.id);
   }
 
+  // 1b) Abgelaufene, nie übernommene Freigaben aufräumen: Der Slot-Zeitpunkt ist
+  // vorbei, niemand hat zugesagt – der Punkt wurde oben schon vergeben, die
+  // Freigabe selbst ist jetzt aber nicht mehr buchbar und wird entfernt.
+  db.prepare("DELETE FROM freigaben WHERE status = 'offen' AND punkt_zeitpunkt <= ?").run(jetzt);
+
   // 2) Quartals-Reset: 1. Jan / 1. Apr / 1. Jul / 1. Okt
   const letzterResetEintrag = db.prepare("SELECT wert FROM einstellungen WHERE schluessel = 'letzter_punkte_reset'").get();
   const letzterReset = letzterResetEintrag ? Number(letzterResetEintrag.wert) : quartalsStart(jetzt);
